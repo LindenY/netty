@@ -20,6 +20,7 @@ import org.jboss.netty.util.internal.ConcurrentHashMap;
 import java.net.SocketAddress;
 import java.util.Random;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 /**
  * A skeletal {@link Channel} implementation.
@@ -58,6 +59,12 @@ public abstract class AbstractChannel implements Channel {
     private String strVal;
     private volatile Object attachment;
 
+    private static final AtomicIntegerFieldUpdater<AbstractChannel> UNWRITABLE_UPDATER;
+    private volatile int unwritable;
+
+    static {
+        UNWRITABLE_UPDATER = AtomicIntegerFieldUpdater.newUpdater(AbstractChannel.class, "unwritable");
+    }
     /**
      * Creates a new instance.
      *
@@ -233,7 +240,58 @@ public abstract class AbstractChannel implements Channel {
     }
 
     public boolean isWritable() {
-        return (getInterestOps() & OP_WRITE) == 0;
+        return (getInterestOps() & OP_WRITE) == 0 && unwritable == 0;
+    }
+
+    public boolean getUserDefinedWritability(int index) {
+        return (unwritable & writabilityMask(index)) == 0;
+    }
+
+    public void setUserDefinedWritability(int index, boolean writable) {
+        if (writable) {
+            setUserDefinedWritability(index);
+        } else {
+            clearUserDefinedWritability(index);
+        }
+    }
+
+    private void setUserDefinedWritability(int index) {
+        final int mask = ~writabilityMask(index);
+        for (;;) {
+            final int oldValue = unwritable;
+            final int newValue = oldValue & mask;
+            if (UNWRITABLE_UPDATER.compareAndSet(this, oldValue, newValue)) {
+                if (oldValue != 0 && newValue == 0) {
+                    getPipeline().sendUpstream(
+                            new UpstreamChannelStateEvent(
+                                    this, ChannelState.INTEREST_OPS, getInterestOps() & ~OP_WRITE));
+                }
+                break;
+            }
+        }
+    }
+
+    private void clearUserDefinedWritability(int index) {
+        final int mask = writabilityMask(index);
+        for (;;) {
+            final int oldValue = unwritable;
+            final int newValue = oldValue | mask;
+            if (UNWRITABLE_UPDATER.compareAndSet(this, oldValue, newValue)) {
+                if (oldValue == 0 && newValue != 0) {
+                    getPipeline().sendUpstream(
+                            new UpstreamChannelStateEvent(
+                                    this, ChannelState.INTEREST_OPS, getInterestOps() | Channel.OP_WRITE));
+                }
+                break;
+            }
+        }
+    }
+
+    private static int writabilityMask(int index) {
+        if (index < 1 || index > 31) {
+            throw new IllegalArgumentException("index: " + index + " (expected: 1~31)");
+        }
+        return 1 << index;
     }
 
     public ChannelFuture setReadable(boolean readable) {

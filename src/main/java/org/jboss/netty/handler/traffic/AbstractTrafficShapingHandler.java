@@ -820,16 +820,6 @@ public abstract class AbstractTrafficShapingHandler extends
         super.channelConnected(ctx, e);
     }
 
-    @Override
-    public void channelInterestChanged(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
-        if ((((Integer) e.getValue()) & Channel.OP_WRITE) == 0 && ! ctx.getChannel().getUserDefinedWritability(index)) {
-            // drop it silently
-            e.getFuture().setSuccess();
-            return;
-        }
-        super.channelInterestChanged(ctx, e);
-    }
-
     protected long calculateSize(Object obj) {
         long size = objectSizeEstimator.estimateSize(obj);
         //logger.debug("Size: "+size);

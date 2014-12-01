@@ -876,31 +876,6 @@ public class GlobalChannelTrafficShapingHandler extends AbstractTrafficShapingHa
     }
 
     @Override
-    public void channelInterestChanged(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
-        if ((((Integer) e.getValue()) & Channel.OP_WRITE) == 0 && ! ctx.getChannel().getUserDefinedWritability(index)) {
-            // drop it silently if too quick
-            if (writeDeviationActive) {
-                Integer key = ctx.getChannel().hashCode();
-                PerChannel perChannel = channelQueues.get(key);
-                if (perChannel != null) {
-                    double maxLocalWrite = 0.0;
-                    maxLocalWrite = perChannel.channelTrafficCounter.getCumulativeWrittenBytes();
-                    double maxGlobalWrite = cumulativeWrittenBytes.get();
-                    if (maxLocalWrite / maxGlobalWrite < maxDeviation) {
-                        // try to not drop event for late channels
-                        ctx.sendUpstream(e);
-                        return;
-                    }
-                }
-            }
-            // drop event
-            e.getFuture().setSuccess();
-            return;
-        }
-        ctx.sendUpstream(e);
-    }
-
-    @Override
     public String toString() {
         return new StringBuilder(super.toString())
             .append(" Write Channel Limit: ").append(writeChannelLimit)

@@ -240,7 +240,11 @@ public abstract class AbstractChannel implements Channel {
     }
 
     public boolean isWritable() {
-        return (getInterestOps() & OP_WRITE) == 0 && unwritable == 0;
+        return (getInterestOps() & OP_WRITE) == 0 && isUserDefinedWritabilitySet();
+    }
+
+    protected boolean isUserDefinedWritabilitySet() {
+        return unwritable == 0;
     }
 
     public boolean getUserDefinedWritability(int index) {
@@ -260,11 +264,13 @@ public abstract class AbstractChannel implements Channel {
         for (;;) {
             final int oldValue = unwritable;
             final int newValue = oldValue & mask;
+            final int current = getInterestOps();
             if (UNWRITABLE_UPDATER.compareAndSet(this, oldValue, newValue)) {
-                if (oldValue != 0 && newValue == 0) {
+                if (oldValue != 0 && newValue == 0 && (current & OP_WRITE) == 0) {
+                    final int newOpValue = current & ~OP_WRITE;
                     getPipeline().sendUpstream(
                             new UpstreamChannelStateEvent(
-                                    this, ChannelState.INTEREST_OPS, getInterestOps() & ~OP_WRITE));
+                                    this, ChannelState.INTEREST_OPS, newOpValue));
                 }
                 break;
             }
@@ -276,11 +282,13 @@ public abstract class AbstractChannel implements Channel {
         for (;;) {
             final int oldValue = unwritable;
             final int newValue = oldValue | mask;
+            final int current = getInterestOps();
             if (UNWRITABLE_UPDATER.compareAndSet(this, oldValue, newValue)) {
-                if (oldValue == 0 && newValue != 0) {
+                if (oldValue == 0 && newValue != 0 && (current & OP_WRITE) == 0) {
+                    final int newOpValue = current | OP_WRITE;
                     getPipeline().sendUpstream(
                             new UpstreamChannelStateEvent(
-                                    this, ChannelState.INTEREST_OPS, getInterestOps() | Channel.OP_WRITE));
+                                    this, ChannelState.INTEREST_OPS, newOpValue));
                 }
                 break;
             }

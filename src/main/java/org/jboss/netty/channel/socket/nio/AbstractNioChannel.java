@@ -285,7 +285,8 @@ abstract class AbstractNioChannel<C extends SelectableChannel & WritableByteChan
             if (newWriteBufferSize >= highWaterMark) {
                 if (newWriteBufferSize - messageSize < highWaterMark) {
                     highWaterMarkCounter.incrementAndGet();
-                    if (!notifying.get()) {
+                    if (!notifying.get()
+                            && AbstractNioChannel.this.isUserDefinedWritabilitySet()) {
                         notifying.set(Boolean.TRUE);
                         fireChannelInterestChanged(AbstractNioChannel.this);
                         notifying.set(Boolean.FALSE);
@@ -305,7 +306,8 @@ abstract class AbstractNioChannel<C extends SelectableChannel & WritableByteChan
                 if (newWriteBufferSize == 0 || newWriteBufferSize < lowWaterMark) {
                     if (newWriteBufferSize + messageSize >= lowWaterMark) {
                         highWaterMarkCounter.decrementAndGet();
-                        if (isConnected() && !notifying.get()) {
+                        if (isConnected() && !notifying.get()
+                                && AbstractNioChannel.this.isUserDefinedWritabilitySet()) {
                             notifying.set(Boolean.TRUE);
                             fireChannelInterestChanged(AbstractNioChannel.this);
                             notifying.set(Boolean.FALSE);

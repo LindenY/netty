@@ -240,7 +240,7 @@ public abstract class AbstractChannel implements Channel {
     }
 
     public boolean isWritable() {
-        return (getInterestOps() & OP_WRITE) == 0 && isUserDefinedWritabilitySet();
+        return (getInterestOps() & OP_WRITE) == 0;
     }
 
     protected boolean isUserDefinedWritabilitySet() {
@@ -266,8 +266,9 @@ public abstract class AbstractChannel implements Channel {
             final int newValue = oldValue & mask;
             final int current = getInterestOps();
             if (UNWRITABLE_UPDATER.compareAndSet(this, oldValue, newValue)) {
-                if (oldValue != 0 && newValue == 0 && (current & OP_WRITE) == 0) {
+                if (oldValue != 0 && newValue == 0) {
                     final int newOpValue = current & ~OP_WRITE;
+                    setInterestOpsNow(newOpValue);
                     getPipeline().sendUpstream(
                             new UpstreamChannelStateEvent(
                                     this, ChannelState.INTEREST_OPS, newOpValue));
@@ -284,8 +285,9 @@ public abstract class AbstractChannel implements Channel {
             final int newValue = oldValue | mask;
             final int current = getInterestOps();
             if (UNWRITABLE_UPDATER.compareAndSet(this, oldValue, newValue)) {
-                if (oldValue == 0 && newValue != 0 && (current & OP_WRITE) == 0) {
+                if (oldValue == 0 && newValue != 0) {
                     final int newOpValue = current | OP_WRITE;
+                    setInterestOpsNow(newOpValue);
                     getPipeline().sendUpstream(
                             new UpstreamChannelStateEvent(
                                     this, ChannelState.INTEREST_OPS, newOpValue));
@@ -300,6 +302,34 @@ public abstract class AbstractChannel implements Channel {
             throw new IllegalArgumentException("index: " + index + " (expected: 1~31)");
         }
         return 1 << index;
+    }
+
+    protected boolean setWritable() {
+        for (;;) {
+            final int oldValue = unwritable;
+            final int newValue = oldValue & ~1;
+            if (UNWRITABLE_UPDATER.compareAndSet(this, oldValue, newValue)) {
+                if (oldValue != 0 && newValue == 0) {
+                    return true;
+                }
+                break;
+            }
+        }
+        return false;
+    }
+
+    protected boolean setUnwritable() {
+        for (;;) {
+            final int oldValue = unwritable;
+            final int newValue = oldValue | 1;
+            if (UNWRITABLE_UPDATER.compareAndSet(this, oldValue, newValue)) {
+                if (oldValue == 0 && newValue != 0) {
+                    return true;
+                }
+                break;
+            }
+        }
+        return false;
     }
 
     public ChannelFuture setReadable(boolean readable) {

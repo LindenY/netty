@@ -75,12 +75,15 @@ public class AbstractChannelTest {
         for (int i = 1; i <= 30; i ++) {
             assertTrue(channel.getUserDefinedWritability(i));
         }
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
         // Ensure that setting a user-defined writability flag to false affects channel.isWritable();
         channel.setUserDefinedWritability(1, false);
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting a user-defined writability flag to true affects channel.isWritable();
         channel.setUserDefinedWritability(1, true);
         assertEquals("false true ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
     }
     @Test
     public void testUserDefinedWritability2() {
@@ -94,18 +97,23 @@ public class AbstractChannelTest {
         for (int i = 1; i <= 30; i ++) {
             assertTrue(channel.getUserDefinedWritability(i));
         }
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
         // Ensure that setting a user-defined writability flag to false affects channel.isWritable();
         channel.setUserDefinedWritability(1, false);
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting another user-defined writability flag to false does not trigger
         // channelWritabilityChanged.
         channel.setUserDefinedWritability(2, false);
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting only one user-defined writability flag to true does not affect channel.isWritable()
         channel.setUserDefinedWritability(1, true);
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting all user-defined writability flags to true affects channel.isWritable()
         channel.setUserDefinedWritability(2, true);
         assertEquals("false true ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
     }
 }

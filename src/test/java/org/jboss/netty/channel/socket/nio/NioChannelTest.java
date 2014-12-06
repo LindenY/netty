@@ -22,6 +22,7 @@ import java.util.concurrent.Executors;
 
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
+import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
@@ -103,10 +104,12 @@ public class NioChannelTest {
         // Ensure exceeding the low watermark does not make channel unwritable.
         channel.write(writeZero(128)).await();
         assertEquals("", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
         // Ensure exceeding the high watermark makes channel unwritable.
         channel.write(writeZero(64)).await();
         channel.write(writeZero(64)).await();
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure going down to the low watermark makes channel writable again by flushing the first write.
         assertNotNull(channel.writeBufferQueue.poll());
         assertEquals(128, channel.writeBufferSize.get());
@@ -114,6 +117,7 @@ public class NioChannelTest {
         assertNotNull(channel.writeBufferQueue.poll());
         assertEquals(64, channel.writeBufferSize.get());
         assertEquals("false true ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
 
         while (! channel.writeBufferQueue.isEmpty()) {
             channel.writeBufferQueue.poll();
@@ -145,12 +149,15 @@ public class NioChannelTest {
         for (int i = 1; i <= 30; i ++) {
             assertTrue(channel.getUserDefinedWritability(i));
         }
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
         // Ensure that setting a user-defined writability flag to false affects channel.isWritable();
         channel.setUserDefinedWritability(1, false);
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting a user-defined writability flag to true affects channel.isWritable();
         channel.setUserDefinedWritability(1, true);
         assertEquals("false true ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
 
         while (! channel.writeBufferQueue.isEmpty()) {
             channel.writeBufferQueue.poll();
@@ -182,19 +189,24 @@ public class NioChannelTest {
         for (int i = 1; i <= 30; i ++) {
             assertTrue(channel.getUserDefinedWritability(i));
         }
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
         // Ensure that setting a user-defined writability flag to false affects channel.isWritable();
         channel.setUserDefinedWritability(1, false);
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting another user-defined writability flag to false does not trigger
         // channelWritabilityChanged.
         channel.setUserDefinedWritability(2, false);
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting only one user-defined writability flag to true does not affect channel.isWritable()
         channel.setUserDefinedWritability(1, true);
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting all user-defined writability flags to true affects channel.isWritable()
         channel.setUserDefinedWritability(2, true);
         assertEquals("false true ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
 
         while (! channel.writeBufferQueue.isEmpty()) {
             channel.writeBufferQueue.poll();
@@ -226,34 +238,63 @@ public class NioChannelTest {
         for (int i = 1; i <= 30; i ++) {
             assertTrue(channel.getUserDefinedWritability(i));
         }
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+
         // Trigger channelWritabilityChanged() by writing a lot.
         channel.write(writeZero(256));
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting a user-defined writability flag to false does not trigger channelWritabilityChanged()
         channel.setUserDefinedWritability(1, false);
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure reducing the totalPendingWriteBytes down to zero does not trigger channelWritabilityChannged()
         // because of the user-defined writability flag.
         assertNotNull(channel.writeBufferQueue.poll());
         assertEquals(0, channel.writeBufferSize.get());
         assertEquals("false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting the user-defined writability flag to true triggers channelWritabilityChanged()
         channel.setUserDefinedWritability(1, true);
         assertEquals("false true ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
 
         // Ensure that setting a user-defined writability flag to false does trigger channelWritabilityChanged()
         channel.setUserDefinedWritability(1, false);
         assertEquals("false true false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Since already triggered, writing a lot should not trigger it
         channel.write(writeZero(256));
         assertEquals("false true false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure that setting the user-defined writability flag to true does not yet trigger channelWritabilityChanged()
         channel.setUserDefinedWritability(1, true);
         assertEquals("false true false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
         // Ensure reducing the totalPendingWriteBytes down to zero does trigger channelWritabilityChannged()
         assertNotNull(channel.writeBufferQueue.poll());
         assertEquals(0, channel.writeBufferSize.get());
         assertEquals("false true false true ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+
+        // Trigger channelWritabilityChanged() by writing a lot.
+        channel.write(writeZero(512));
+        assertEquals("false true false true false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
+        // Ensure that setting a user-defined writability flag to false does not trigger channelWritabilityChanged()
+        channel.setUserDefinedWritability(1, false);
+        assertEquals("false true false true false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
+        // Ensure that setting the user-defined writability flag to true does not triggers channelWritabilityChanged()
+        channel.setUserDefinedWritability(1, true);
+        assertEquals("false true false true false ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) != 0);
+        // Ensure reducing the totalPendingWriteBytes down to zero does not trigger channelWritabilityChannged()
+        // because of the user-defined writability flag.
+        assertNotNull(channel.writeBufferQueue.poll());
+        assertEquals(0, channel.writeBufferSize.get());
+        assertEquals("false true false true false true ", buf.toString());
+        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
 
         while (! channel.writeBufferQueue.isEmpty()) {
             channel.writeBufferQueue.poll();

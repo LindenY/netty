@@ -15,10 +15,11 @@
  */
 package org.jboss.netty.channel;
 
+import org.junit.Test;
+
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
-import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class AbstractChannelTest {
@@ -55,7 +56,7 @@ public class AbstractChannelTest {
         }
     }
     private static class TestChannelHandler extends SimpleChannelHandler {
-        private StringBuilder buf = new StringBuilder();
+        private final StringBuilder buf = new StringBuilder();
         @Override
         public void channelInterestChanged(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
             buf.append(ctx.getChannel().isWritable());
@@ -75,7 +76,7 @@ public class AbstractChannelTest {
         for (int i = 1; i <= 30; i ++) {
             assertTrue(channel.getUserDefinedWritability(i));
         }
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
         // Ensure that setting a user-defined writability flag to false affects channel.isWritable();
         channel.setUserDefinedWritability(1, false);
         assertEquals("false ", buf.toString());
@@ -83,7 +84,7 @@ public class AbstractChannelTest {
         // Ensure that setting a user-defined writability flag to true affects channel.isWritable();
         channel.setUserDefinedWritability(1, true);
         assertEquals("false true ", buf.toString());
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
     }
     @Test
     public void testUserDefinedWritability2() {
@@ -97,7 +98,7 @@ public class AbstractChannelTest {
         for (int i = 1; i <= 30; i ++) {
             assertTrue(channel.getUserDefinedWritability(i));
         }
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
         // Ensure that setting a user-defined writability flag to false affects channel.isWritable();
         channel.setUserDefinedWritability(1, false);
         assertEquals("false ", buf.toString());
@@ -114,6 +115,6 @@ public class AbstractChannelTest {
         // Ensure that setting all user-defined writability flags to true affects channel.isWritable()
         channel.setUserDefinedWritability(2, true);
         assertEquals("false true ", buf.toString());
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
     }
 }

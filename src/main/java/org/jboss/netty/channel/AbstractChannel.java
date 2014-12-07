@@ -60,11 +60,13 @@ public abstract class AbstractChannel implements Channel {
     private volatile Object attachment;
 
     private static final AtomicIntegerFieldUpdater<AbstractChannel> UNWRITABLE_UPDATER;
+    @SuppressWarnings("UnusedDeclaration")
     private volatile int unwritable;
 
     static {
         UNWRITABLE_UPDATER = AtomicIntegerFieldUpdater.newUpdater(AbstractChannel.class, "unwritable");
     }
+
     /**
      * Creates a new instance.
      *
@@ -219,6 +221,14 @@ public abstract class AbstractChannel implements Channel {
     }
 
     public int getInterestOps() {
+        if (!isOpen()) {
+            return Channel.OP_WRITE;
+        }
+
+        int interestOps = getInternalInterestOps() & ~OP_WRITE;
+        if (!isWritable()) {
+            interestOps |= OP_WRITE;
+        }
         return interestOps;
     }
 
@@ -226,32 +236,32 @@ public abstract class AbstractChannel implements Channel {
         return Channels.setInterestOps(this, interestOps);
     }
 
+    protected int getInternalInterestOps() {
+        return interestOps;
+    }
+
     /**
      * Sets the {@link #getInterestOps() interestOps} property of this channel
      * immediately.  This method is intended to be called by an internal
      * component - please do not call it unless you know what you are doing.
      */
-    protected void setInterestOpsNow(int interestOps) {
+    protected void setInternalInterestOps(int interestOps) {
         this.interestOps = interestOps;
     }
 
     public boolean isReadable() {
-        return (getInterestOps() & OP_READ) != 0;
+        return (getInternalInterestOps() & OP_READ) != 0;
     }
 
     public boolean isWritable() {
-        return (getInterestOps() & OP_WRITE) == 0;
-    }
-
-    protected boolean isUserDefinedWritabilitySet() {
         return unwritable == 0;
     }
 
-    public boolean getUserDefinedWritability(int index) {
+    public final boolean getUserDefinedWritability(int index) {
         return (unwritable & writabilityMask(index)) == 0;
     }
 
-    public void setUserDefinedWritability(int index, boolean writable) {
+    public final void setUserDefinedWritability(int index, boolean writable) {
         if (writable) {
             setUserDefinedWritability(index);
         } else {
@@ -264,14 +274,11 @@ public abstract class AbstractChannel implements Channel {
         for (;;) {
             final int oldValue = unwritable;
             final int newValue = oldValue & mask;
-            final int current = getInterestOps();
             if (UNWRITABLE_UPDATER.compareAndSet(this, oldValue, newValue)) {
                 if (oldValue != 0 && newValue == 0) {
-                    final int newOpValue = current & ~OP_WRITE;
-                    setInterestOpsNow(newOpValue);
                     getPipeline().sendUpstream(
                             new UpstreamChannelStateEvent(
-                                    this, ChannelState.INTEREST_OPS, newOpValue));
+                                    this, ChannelState.INTEREST_OPS, getInterestOps()));
                 }
                 break;
             }
@@ -283,14 +290,11 @@ public abstract class AbstractChannel implements Channel {
         for (;;) {
             final int oldValue = unwritable;
             final int newValue = oldValue | mask;
-            final int current = getInterestOps();
             if (UNWRITABLE_UPDATER.compareAndSet(this, oldValue, newValue)) {
                 if (oldValue == 0 && newValue != 0) {
-                    final int newOpValue = current | OP_WRITE;
-                    setInterestOpsNow(newOpValue);
                     getPipeline().sendUpstream(
                             new UpstreamChannelStateEvent(
-                                    this, ChannelState.INTEREST_OPS, newOpValue));
+                                    this, ChannelState.INTEREST_OPS, getInterestOps()));
                 }
                 break;
             }
@@ -431,7 +435,7 @@ public abstract class AbstractChannel implements Channel {
 
     private final class ChannelCloseFuture extends DefaultChannelFuture {
 
-        public ChannelCloseFuture() {
+        ChannelCloseFuture() {
             super(AbstractChannel.this, false);
         }
 

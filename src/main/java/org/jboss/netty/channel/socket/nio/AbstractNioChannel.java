@@ -153,46 +153,14 @@ abstract class AbstractNioChannel<C extends SelectableChannel & WritableByteChan
 
     public abstract NioChannelConfig getConfig();
 
-    int getRawInterestOps() {
-        return super.getInterestOps();
-    }
-
-    void setRawInterestOpsNow(int interestOps) {
-        setInterestOpsNow(interestOps);
+    @Override
+    protected int getInternalInterestOps() {
+        return super.getInternalInterestOps();
     }
 
     @Override
-    public int getInterestOps() {
-        if (!isOpen()) {
-            return Channel.OP_WRITE;
-        }
-
-        int interestOps = getRawInterestOps();
-        if (!isUserDefinedWritabilitySet()) {
-            return interestOps |= Channel.OP_WRITE;
-        }
-        int writeBufferSize = this.writeBufferSize.get();
-        if (writeBufferSize != 0) {
-            if (highWaterMarkCounter.get() > 0) {
-                int lowWaterMark = getConfig().getWriteBufferLowWaterMark();
-                if (writeBufferSize >= lowWaterMark) {
-                    interestOps |= Channel.OP_WRITE;
-                } else {
-                    interestOps &= ~Channel.OP_WRITE;
-                }
-            } else {
-                int highWaterMark = getConfig().getWriteBufferHighWaterMark();
-                if (writeBufferSize >= highWaterMark) {
-                    interestOps |= Channel.OP_WRITE;
-                } else {
-                    interestOps &= ~Channel.OP_WRITE;
-                }
-            }
-        } else {
-            interestOps &= ~Channel.OP_WRITE;
-        }
-
-        return interestOps;
+    protected void setInternalInterestOps(int interestOps) {
+        super.setInternalInterestOps(interestOps);
     }
 
     @Override

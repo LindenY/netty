@@ -15,11 +15,6 @@
  */
 package org.jboss.netty.channel.socket.nio;
 
-import java.io.IOException;
-import java.nio.channels.SocketChannel;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.Channel;
@@ -31,15 +26,17 @@ import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.DefaultChannelPipeline;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelHandler;
-import org.jboss.netty.channel.socket.nio.NioSocketChannel;
-import org.jboss.netty.channel.socket.nio.NioWorker;
-
 import org.junit.Test;
+
+import java.nio.channels.SocketChannel;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import static org.junit.Assert.*;
 
 public class NioChannelTest {
     private static class TestChannelHandler extends SimpleChannelHandler {
-        private StringBuilder buf = new StringBuilder();
+        private final StringBuilder buf = new StringBuilder();
         @Override
         public void channelInterestChanged(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
             buf.append(ctx.getChannel().isWritable());
@@ -59,7 +56,7 @@ public class NioChannelTest {
         }
     }
     private static class TestNioChannel extends NioSocketChannel {
-        public TestNioChannel(ChannelPipeline pipeline, ChannelSink sink,
+        TestNioChannel(ChannelPipeline pipeline, ChannelSink sink,
                 SocketChannel socket, NioWorker worker) {
             super(null, null, pipeline, sink, socket, worker);
         }
@@ -76,24 +73,18 @@ public class NioChannelTest {
             return true;
         }
     }
-    private ChannelBuffer writeZero(int size) {
+    private static ChannelBuffer writeZero(int size) {
         ChannelBuffer cb =  ChannelBuffers.buffer(size);
         cb.writeZero(size);
         return cb;
     }
     @Test
-    public void testWritability() throws InterruptedException {
+    public void testWritability() throws Exception {
         DefaultChannelPipeline pipeline = new DefaultChannelPipeline();
         TestChannelHandler handler = new TestChannelHandler();
         StringBuilder buf = handler.buf;
         pipeline.addLast("TRACE", handler);
-        SocketChannel socketChannel = null;
-        try {
-            socketChannel = SocketChannel.open();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
+        SocketChannel socketChannel = SocketChannel.open();
         ExecutorService executor = Executors.newCachedThreadPool();
         NioWorker worker = new NioWorker(executor);
         TestNioChannel channel = new TestNioChannel(pipeline, new TestChannelSink(),
@@ -104,7 +95,7 @@ public class NioChannelTest {
         // Ensure exceeding the low watermark does not make channel unwritable.
         channel.write(writeZero(128)).await();
         assertEquals("", buf.toString());
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
         // Ensure exceeding the high watermark makes channel unwritable.
         channel.write(writeZero(64)).await();
         channel.write(writeZero(64)).await();
@@ -117,7 +108,7 @@ public class NioChannelTest {
         assertNotNull(channel.writeBufferQueue.poll());
         assertEquals(64, channel.writeBufferSize.get());
         assertEquals("false true ", buf.toString());
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
 
         while (! channel.writeBufferQueue.isEmpty()) {
             channel.writeBufferQueue.poll();
@@ -126,18 +117,12 @@ public class NioChannelTest {
         executor.shutdown();
     }
     @Test
-    public void testUserDefinedWritability() {
+    public void testUserDefinedWritability() throws Exception {
         DefaultChannelPipeline pipeline = new DefaultChannelPipeline();
         TestChannelHandler handler = new TestChannelHandler();
         StringBuilder buf = handler.buf;
         pipeline.addLast("TRACE", handler);
-        SocketChannel socketChannel = null;
-        try {
-            socketChannel = SocketChannel.open();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
+        SocketChannel socketChannel = SocketChannel.open();
         ExecutorService executor = Executors.newCachedThreadPool();
         NioWorker worker = new NioWorker(executor);
         TestNioChannel channel = new TestNioChannel(pipeline, new TestChannelSink(),
@@ -149,7 +134,7 @@ public class NioChannelTest {
         for (int i = 1; i <= 30; i ++) {
             assertTrue(channel.getUserDefinedWritability(i));
         }
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
         // Ensure that setting a user-defined writability flag to false affects channel.isWritable();
         channel.setUserDefinedWritability(1, false);
         assertEquals("false ", buf.toString());
@@ -157,7 +142,7 @@ public class NioChannelTest {
         // Ensure that setting a user-defined writability flag to true affects channel.isWritable();
         channel.setUserDefinedWritability(1, true);
         assertEquals("false true ", buf.toString());
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
 
         while (! channel.writeBufferQueue.isEmpty()) {
             channel.writeBufferQueue.poll();
@@ -166,18 +151,12 @@ public class NioChannelTest {
         executor.shutdown();
     }
     @Test
-    public void testUserDefinedWritability2() {
+    public void testUserDefinedWritability2() throws Exception {
         DefaultChannelPipeline pipeline = new DefaultChannelPipeline();
         TestChannelHandler handler = new TestChannelHandler();
         StringBuilder buf = handler.buf;
         pipeline.addLast("TRACE", handler);
-        SocketChannel socketChannel = null;
-        try {
-            socketChannel = SocketChannel.open();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
+        SocketChannel socketChannel = SocketChannel.open();
         ExecutorService executor = Executors.newCachedThreadPool();
         NioWorker worker = new NioWorker(executor);
         TestNioChannel channel = new TestNioChannel(pipeline, new TestChannelSink(),
@@ -189,7 +168,7 @@ public class NioChannelTest {
         for (int i = 1; i <= 30; i ++) {
             assertTrue(channel.getUserDefinedWritability(i));
         }
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
         // Ensure that setting a user-defined writability flag to false affects channel.isWritable();
         channel.setUserDefinedWritability(1, false);
         assertEquals("false ", buf.toString());
@@ -206,7 +185,7 @@ public class NioChannelTest {
         // Ensure that setting all user-defined writability flags to true affects channel.isWritable()
         channel.setUserDefinedWritability(2, true);
         assertEquals("false true ", buf.toString());
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
 
         while (! channel.writeBufferQueue.isEmpty()) {
             channel.writeBufferQueue.poll();
@@ -215,18 +194,12 @@ public class NioChannelTest {
         executor.shutdown();
     }
     @Test
-    public void testMixedWritability() {
+    public void testMixedWritability() throws Exception {
         DefaultChannelPipeline pipeline = new DefaultChannelPipeline();
         TestChannelHandler handler = new TestChannelHandler();
         StringBuilder buf = handler.buf;
         pipeline.addLast("TRACE", handler);
-        SocketChannel socketChannel = null;
-        try {
-            socketChannel = SocketChannel.open();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
+        SocketChannel socketChannel = SocketChannel.open();
         ExecutorService executor = Executors.newCachedThreadPool();
         NioWorker worker = new NioWorker(executor);
         TestNioChannel channel = new TestNioChannel(pipeline, new TestChannelSink(),
@@ -238,7 +211,7 @@ public class NioChannelTest {
         for (int i = 1; i <= 30; i ++) {
             assertTrue(channel.getUserDefinedWritability(i));
         }
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
 
         // Trigger channelWritabilityChanged() by writing a lot.
         channel.write(writeZero(256));
@@ -257,7 +230,7 @@ public class NioChannelTest {
         // Ensure that setting the user-defined writability flag to true triggers channelWritabilityChanged()
         channel.setUserDefinedWritability(1, true);
         assertEquals("false true ", buf.toString());
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
 
         // Ensure that setting a user-defined writability flag to false does trigger channelWritabilityChanged()
         channel.setUserDefinedWritability(1, false);
@@ -275,7 +248,7 @@ public class NioChannelTest {
         assertNotNull(channel.writeBufferQueue.poll());
         assertEquals(0, channel.writeBufferSize.get());
         assertEquals("false true false true ", buf.toString());
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
 
         // Trigger channelWritabilityChanged() by writing a lot.
         channel.write(writeZero(512));
@@ -294,7 +267,7 @@ public class NioChannelTest {
         assertNotNull(channel.writeBufferQueue.poll());
         assertEquals(0, channel.writeBufferSize.get());
         assertEquals("false true false true false true ", buf.toString());
-        assertTrue((channel.getInterestOps() & Channel.OP_WRITE) == 0);
+        assertEquals(0, channel.getInterestOps() & Channel.OP_WRITE);
 
         while (! channel.writeBufferQueue.isEmpty()) {
             channel.writeBufferQueue.poll();
